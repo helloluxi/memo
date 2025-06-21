@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Memo</title>
+    <link href="https://fonts.googleapis.com/css2?family=Comic+Neue:wght@700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-light: #f5f5f5;
+            --bg-dark: #1a1a1a;
+            --surface-light: white;
+            --surface-dark: #2d2d2d;
+            --surface-darker: #3d3d3d;
+            --text-light: #000000;
+            --text-dark: #ffffff;
+            --border-light: #ddd;
+            --border-dark: #555;
+            --shadow-light: rgba(0, 0, 0, 0.1);
+            --shadow-dark: rgba(0, 0, 0, 0.3);
+            --overlay: rgba(0, 0, 0, 0.5);
+            --primary: #007bff;
+            --secondary: #6c757d;
+            --inactive: #ccc;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background-color: var(--bg-light);
+            font-family: 'Comic Neue', cursive;
+            user-select: none;
+            gap: 0.5rem;
+        }
+
+        * {
+            user-select: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+        }
+
+        #bottom {
+            font-size: 5rem;
+            font-weight: bold;
+            color: var(--text-light);
+        }
+
+        #top {
+            font-size: 5rem;
+            font-weight: bold;
+            padding: 0.5rem 1.5rem;
+            border-radius: 1rem;
+            background-color: var(--surface-light);
+            box-shadow: 0 0 10px var(--shadow-light);
+            margin-top: 2rem;
+            cursor: pointer;
+            color: var(--text-light);
+        }
+
+        body.dark-theme {
+            background-color: var(--bg-dark);
+            color: var(--text-dark);
+        }
+
+        body.dark-theme #top {
+            background-color: var(--surface-dark);
+            color: var(--text-dark);
+        }
+
+        body.dark-theme #bottom {
+            color: var(--text-dark);
+        }
+
+        .popup-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--overlay);
+            z-index: 1000;
+        }
+
+        .popup-window {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: var(--surface-light);
+            border-radius: 1rem;
+            box-shadow: 0 10px 30px var(--shadow-dark);
+            padding: 2rem;
+            width: 90%;
+            max-width: 400px;
+            font-family: 'Comic Neue', cursive;
+            color: var(--text-light);
+        }
+
+        body.dark-theme .popup-window {
+            background-color: var(--surface-dark);
+            color: var(--text-dark);
+        }
+
+        .popup-title {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 1.5rem;
+            text-align: center;
+        }
+
+        .setting-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 1rem;
+            gap: 1rem;
+        }
+
+        .setting-row.theme-row {
+            justify-content: center;
+        }
+
+        .setting-label {
+            font-weight: bold;
+            min-width: 80px;
+        }
+
+        .setting-input {
+            flex: 1;
+            padding: 0.5rem;
+            border: 1px solid var(--border-light);
+            border-radius: 0.5rem;
+            font-family: inherit;
+            font-size: 1rem;
+            background-color: var(--surface-light);
+            color: var(--text-light);
+        }
+
+        body.dark-theme .setting-input {
+            background-color: var(--surface-darker);
+            border-color: var(--border-dark);
+            color: var(--text-dark);
+        }
+        
+        .separator-input {
+            width: 30px;
+            text-align: center;
+            flex: none !important;
+            margin-left: 0.5rem;
+        }
+
+        .theme-toggle {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            cursor: pointer;
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 50px;
+            height: 24px;
+            background-color: var(--inactive);
+            border-radius: 12px;
+            transition: background-color 0.3s;
+        }
+
+        .toggle-switch.active {
+            background-color: var(--primary);
+        }
+
+        .toggle-slider {
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 20px;
+            height: 20px;
+            background-color: var(--surface-light);
+            border-radius: 50%;
+            transition: transform 0.3s;
+        }
+
+        .toggle-switch.active .toggle-slider {
+            transform: translateX(26px);
+        }
+
+        .popup-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin-top: 2rem;
+        }
+
+        .popup-button {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 0.5rem;
+            font-family: inherit;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 1rem;
+            color: var(--text-dark);
+        }
+
+        .close-button {
+            background-color: var(--secondary);
+        }
+
+        .save-button {
+            background-color: var(--primary);
+        }
+
+        .popup-button:hover {
+            opacity: 0.8;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="top"></div>
+    <div id="bottom"></div>
+
+    <!-- Settings Popup -->
+    <div id="settingsPopup" class="popup-overlay">
+        <div class="popup-window">
+            <div class="popup-title">Settings</div>
+            <div class="setting-row">
+                <input type="url" id="urlInput" class="setting-input" placeholder="URL">
+                <input type="text" id="separatorInput" class="setting-input separator-input" placeholder="=" value="=" maxlength="3">
+            </div>
+            <div class="setting-row theme-row">
+                <div class="theme-toggle" onclick="toggleThemePreview()">
+                    <span id="themeLabel">Light</span>
+                    <div class="toggle-switch" id="themeSwitch">
+                        <div class="toggle-slider"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="popup-buttons">
+                <button class="popup-button save-button" onclick="saveSettings()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let list;
+        let topElem = document.getElementById('top');
+        let bottomElem = document.getElementById('bottom');
+        let currentUrl = '';
+        let currentSeparator = '=';
+        let isDarkTheme = false;
+
+        function initializeSettings() {
+            const savedUrl = localStorage.getItem('memo.url');
+            const savedSeparator = localStorage.getItem('memo.sep');
+            const savedTheme = localStorage.getItem('theme');
+
+            if (savedUrl) currentUrl = savedUrl;
+            if (savedSeparator) currentSeparator = savedSeparator;
+            if (savedTheme) {
+                isDarkTheme = savedTheme === 'dark';
+                applyTheme();
+            }
+
+            // Show settings popup if no URL is saved
+            if (!savedUrl) {
+                openSettingsPopup();
+            }
+        }
+
+        function updateDisplay() {
+            if (!list || list.length === 0) {
+                topElem.textContent = 'No data';
+                bottomElem.textContent = 'Long-press to configure';
+                return;
+            }
+
+            let rd = Math.floor(Math.random() * list.length);
+            let line = list[rd].trim();
+            if (!line) return updateDisplay(); // Skip empty lines
+
+            let separatorIndex = line.indexOf(currentSeparator);
+            if (separatorIndex === -1) {
+                // If separator not found, show the whole line as key
+                topElem.textContent = line;
+                bottomElem.textContent = '';
+            } else {
+                let key = line.substring(0, separatorIndex);
+                let val = line.substring(separatorIndex + currentSeparator.length);
+                topElem.textContent = key.trim();
+                bottomElem.textContent = val.trim();
+            }
+        }
+
+        function loadData() {
+            fetch(currentUrl)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.text();
+                })
+                .then(text => {
+                    list = text.split('\n').filter(line => line.trim() !== '');
+                    updateDisplay();
+                })
+                .catch(error => {
+                    console.error('Error loading data:', error);
+                    topElem.textContent = 'Error';
+                    bottomElem.textContent = 'Could not load data';
+                    list = [];
+                });
+        }
+        
+        // Settings popup functions
+        function openSettingsPopup() {
+            document.getElementById('urlInput').value = currentUrl;
+            document.getElementById('separatorInput').value = currentSeparator;
+
+            const themeSwitch = document.getElementById('themeSwitch');
+            const themeLabel = document.getElementById('themeLabel');
+
+            if (isDarkTheme) {
+                themeSwitch.classList.add('active');
+                themeLabel.textContent = 'Dark';
+            } else {
+                themeSwitch.classList.remove('active');
+                themeLabel.textContent = 'Light';
+            }
+
+            document.getElementById('settingsPopup').style.display = 'block';
+        }
+
+        function closeSettingsPopup() {
+            document.getElementById('settingsPopup').style.display = 'none';
+            applyTheme();
+        }
+
+        function toggleThemePreview() {
+            const themeSwitch = document.getElementById('themeSwitch');
+            const themeLabel = document.getElementById('themeLabel');
+
+            if (themeSwitch.classList.contains('active')) {
+                themeSwitch.classList.remove('active');
+                themeLabel.textContent = 'Light';
+                document.body.classList.remove('dark-theme');
+            } else {
+                themeSwitch.classList.add('active');
+                themeLabel.textContent = 'Dark';
+                document.body.classList.add('dark-theme');
+            }
+        }
+
+        function applyTheme() {
+            if (isDarkTheme) {
+                document.body.classList.add('dark-theme');
+            } else {
+                document.body.classList.remove('dark-theme');
+            }
+        }
+
+        
+        function saveSettings() {
+            const newUrl = document.getElementById('urlInput').value.trim();
+            const newSeparator = document.getElementById('separatorInput').value || '=';
+            const themeSwitch = document.getElementById('themeSwitch');
+            const newTheme = themeSwitch.classList.contains('active');
+
+            // Save to localStorage
+            currentUrl = newUrl;
+            currentSeparator = newSeparator;
+            isDarkTheme = newTheme;
+
+            localStorage.setItem('memo.url', currentUrl);
+            localStorage.setItem('memo.sep', currentSeparator);
+            localStorage.setItem('theme', isDarkTheme ? 'dark' : 'light');
+
+            applyTheme();
+            closeSettingsPopup();
+            loadData();
+        }
+        
+        // Event listeners
+        let hasTouchSupport = 'ontouchstart' in window;
+        
+        if (hasTouchSupport) {
+            document.addEventListener('touchstart', updateDisplay);
+        } else {
+            document.addEventListener('click', updateDisplay);
+        }
+
+        // Long press variables
+        let longPressTimer;
+        let isLongPress = false;
+        
+        // Long press to open settings (1500ms)
+        function startLongPress(e) {
+            isLongPress = false;
+            longPressTimer = setTimeout(() => {
+                isLongPress = true;
+                e.preventDefault();
+                openSettingsPopup();
+            }, 1500);
+        }
+
+        function endLongPress(e) {
+            clearTimeout(longPressTimer);
+            if (isLongPress) {
+                e.preventDefault();
+                e.stopPropagation();
+                return;
+            }
+            // Only update display if it wasn't a long press and we're not already handling it globally
+            if (hasTouchSupport) {
+                e.preventDefault(); // Prevent the click event on touch devices
+            }
+        }
+
+        function cancelLongPress() {
+            clearTimeout(longPressTimer);
+            isLongPress = false;
+        }
+        
+        // Add long press event listeners for both touch and mouse
+        [topElem, bottomElem].forEach(elem => {
+            if (hasTouchSupport) {
+                // Touch events only
+                elem.addEventListener('touchstart', startLongPress);
+                elem.addEventListener('touchend', endLongPress);
+                elem.addEventListener('touchmove', cancelLongPress);
+                elem.addEventListener('touchcancel', cancelLongPress);
+            } else {
+                // Mouse events only
+                elem.addEventListener('mousedown', startLongPress);
+                elem.addEventListener('mouseup', endLongPress);
+                elem.addEventListener('mouseleave', cancelLongPress);
+                elem.addEventListener('mousemove', cancelLongPress);
+            }
+        });
+
+        // Initialize on page load
+        initializeSettings();
+        loadData();
+    </script>
+</body>
+
+</html>
