@@ -391,7 +391,7 @@
 
             applyTheme();
             closeSettingsPopup();
-            loadData();
+            loadDataWithCache();
         }
         
         // Event listeners
@@ -452,9 +452,66 @@
             }
         });
 
+        // Service Worker Registration
+        function registerServiceWorker() {
+            if ('serviceWorker' in navigator) {
+                window.addEventListener('load', () => {
+                    navigator.serviceWorker.register('./sw.js')
+                        .then(registration => {
+                            console.log('SW registered: ', registration);
+                            
+                            // Send memo URL to service worker for caching
+                            if (currentUrl) {
+                                navigator.serviceWorker.ready.then(registration => {
+                                    if (registration.active) {
+                                        registration.active.postMessage({
+                                            type: 'CACHE_MEMO_URL',
+                                            url: currentUrl
+                                        });
+                                    }
+                                });
+                            }
+                        })
+                        .catch(registrationError => {
+                            console.log('SW registration failed: ', registrationError);
+                        });
+                });
+            }
+        }
+
+        // Enhanced loadData function to update service worker cache
+        function loadDataWithCache() {
+            fetch(currentUrl)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.text();
+                })
+                .then(text => {
+                    list = text.split('\n').filter(line => line.trim() !== '');
+                    updateDisplay();
+                    
+                    // Update service worker cache with new URL
+                    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+                        navigator.serviceWorker.controller.postMessage({
+                            type: 'CACHE_MEMO_URL',
+                            url: currentUrl
+                        });
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading data:', error);
+                    topElem.textContent = 'Error';
+                    bottomElem.textContent = 'Could not load data';
+                    list = [];
+                });
+        }
+
         // Initialize on page load
+        registerServiceWorker();
         initializeSettings();
-        loadData();
+        loadDataWithCache();
     </script>
 </body>
 
