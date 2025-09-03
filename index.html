@@ -148,7 +148,7 @@
             border-color: var(--border-dark);
             color: var(--text-dark);
         }
-        
+
         .separator-input {
             width: 30px;
             text-align: center;
@@ -222,6 +222,22 @@
             opacity: 0.8;
         }
 
+        #countdown-circle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: conic-gradient(var(--primary) 0deg, transparent 0deg);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        body.dark-theme #countdown-circle {
+            background: conic-gradient(var(--primary) 0deg, transparent 0deg);
+        }
+
         @media screen and (max-width: 768px) and (orientation: portrait) {
             #bottom {
                 font-size: 2rem;
@@ -231,6 +247,7 @@
 </head>
 
 <body>
+    <div id="countdown-circle"></div>
     <div id="top"></div>
     <div id="bottom"></div>
 
@@ -240,12 +257,19 @@
             <div class="popup-title">Settings</div>
             <div class="setting-row">
                 <input type="url" id="urlInput" class="setting-input" placeholder="URL">
-                <input type="text" id="separatorInput" class="setting-input separator-input" placeholder="=" value="=" maxlength="3">
+                <input type="text" id="separatorInput" class="setting-input separator-input" placeholder="=" value="="
+                    maxlength="3">
             </div>
             <div class="setting-row theme-row">
                 <div class="theme-toggle" onclick="toggleThemePreview()">
                     <span id="themeLabel">Light</span>
                     <div class="toggle-switch" id="themeSwitch">
+                        <div class="toggle-slider"></div>
+                    </div>
+                </div>
+                <div class="theme-toggle" onclick="toggleAutoSwitch()" style="margin-left:1rem;">
+                    <span id="autoLabel">Auto</span>
+                    <div class="toggle-switch" id="autoSwitch">
                         <div class="toggle-slider"></div>
                     </div>
                 </div>
@@ -263,14 +287,21 @@
         let currentUrl = '';
         let currentSeparator = '=';
         let isDarkTheme = false;
+        let isAutoSwitch = false;
+        let autoSwitchTimer = null;
+        let cachedData = null;
+        let countdownCircle = null;
+        let countdownAnimation = null;
 
         function initializeSettings() {
             const savedUrl = localStorage.getItem('memo.url');
             const savedSeparator = localStorage.getItem('memo.sep');
             const savedTheme = localStorage.getItem('theme');
+            const savedCachedData = localStorage.getItem('memo.cache');
 
             if (savedUrl) currentUrl = savedUrl;
             if (savedSeparator) currentSeparator = savedSeparator;
+            if (savedCachedData) cachedData = savedCachedData;
             if (savedTheme) {
                 isDarkTheme = savedTheme === 'dark';
                 applyTheme();
@@ -315,19 +346,34 @@
                     return response.text();
                 })
                 .then(text => {
+                    cachedData = text;
+                    localStorage.setItem('memo.cache', cachedData);
                     list = text.split('\n').filter(line => line.trim() !== '');
                     updateDisplay();
                 })
                 .catch(error => {
-                    console.error('Error loading data:', error);
-                    topElem.textContent = 'Error';
-                    bottomElem.textContent = 'Could not load data';
-                    list = [];
+                    alert('Error loading data: ' + error);
+                    // Try to use cached data if available
+                    if (cachedData) {
+                        list = cachedData.split('\n').filter(line => line.trim() !== '');
+                        updateDisplay();
+                    } else {
+                        topElem.textContent = 'Error';
+                        bottomElem.textContent = 'Could not load data';
+                        list = [];
+                    }
                 });
         }
-        
+
         // Settings popup functions
         function openSettingsPopup() {
+            // Set auto switch UI
+            const autoSwitch = document.getElementById('autoSwitch');
+            if (isAutoSwitch) {
+                autoSwitch.classList.add('active');
+            } else {
+                autoSwitch.classList.remove('active');
+            }
             document.getElementById('urlInput').value = currentUrl;
             document.getElementById('separatorInput').value = currentSeparator;
 
@@ -373,12 +419,21 @@
             }
         }
 
-        
+
         function saveSettings() {
+            // Save auto switch state
+            const autoSwitch = document.getElementById('autoSwitch');
+            isAutoSwitch = autoSwitch.classList.contains('active');
+            localStorage.setItem('memo.auto', isAutoSwitch ? '1' : '0');
+            handleAutoSwitch();
             const newUrl = document.getElementById('urlInput').value.trim();
             const newSeparator = document.getElementById('separatorInput').value || '=';
             const themeSwitch = document.getElementById('themeSwitch');
             const newTheme = themeSwitch.classList.contains('active');
+
+            // Check if URL or separator changed
+            const urlChanged = newUrl !== currentUrl;
+            const separatorChanged = newSeparator !== currentSeparator;
 
             // Save to localStorage
             currentUrl = newUrl;
@@ -391,12 +446,19 @@
 
             applyTheme();
             closeSettingsPopup();
-            loadDataWithCache();
+
+            // Only fetch new data if URL changed, otherwise use cached data with new separator
+            if (urlChanged) {
+                loadDataWithCache();
+            } else if (separatorChanged && cachedData) {
+                list = cachedData.split('\n').filter(line => line.trim() !== '');
+                updateDisplay();
+            }
         }
-        
+
         // Event listeners
         let hasTouchSupport = 'ontouchstart' in window;
-        
+
         if (hasTouchSupport) {
             document.addEventListener('touchstart', updateDisplay);
         } else {
@@ -406,15 +468,15 @@
         // Long press variables
         let longPressTimer;
         let isLongPress = false;
-        
-        // Long press to open settings (1500ms)
+
+        // Long press to open settings (500ms)
         function startLongPress(e) {
             isLongPress = false;
             longPressTimer = setTimeout(() => {
                 isLongPress = true;
                 e.preventDefault();
                 openSettingsPopup();
-            }, 1500);
+            }, 500);
         }
 
         function endLongPress(e) {
@@ -434,7 +496,7 @@
             clearTimeout(longPressTimer);
             isLongPress = false;
         }
-        
+
         // Add long press event listeners for both touch and mouse
         [topElem, bottomElem].forEach(elem => {
             if (hasTouchSupport) {
@@ -453,13 +515,66 @@
         });
 
         // Service Worker Registration
+        // Auto switch logic
+        function handleAutoSwitch() {
+            countdownCircle = document.getElementById('countdown-circle');
+
+            if (isAutoSwitch) {
+                if (autoSwitchTimer) clearInterval(autoSwitchTimer);
+                countdownCircle.style.opacity = '1';
+                startCountdownAnimation();
+                autoSwitchTimer = setInterval(() => {
+                    updateDisplay();
+                    startCountdownAnimation();
+                }, 3000);
+            } else {
+                if (autoSwitchTimer) clearInterval(autoSwitchTimer);
+                if (countdownAnimation) countdownAnimation.cancel();
+                countdownCircle.style.opacity = '0';
+                autoSwitchTimer = null;
+            }
+        }
+
+        function startCountdownAnimation() {
+            if (countdownAnimation) countdownAnimation.cancel();
+            countdownCircle.style.background = 'conic-gradient(var(--primary) 0deg, transparent 0deg)';
+            let startTime = Date.now();
+
+            function updatePie() {
+                let elapsed = Date.now() - startTime;
+                let progress = Math.min(elapsed / 3000, 1);
+                let degrees = progress * 360;
+                countdownCircle.style.background = `conic-gradient(var(--primary) ${degrees}deg, transparent ${degrees}deg)`;
+
+                if (progress < 1) {
+                    requestAnimationFrame(updatePie);
+                }
+            }
+
+            requestAnimationFrame(updatePie);
+        }
+
+        function toggleAutoSwitch() {
+            isAutoSwitch = !isAutoSwitch;
+            const autoSwitch = document.getElementById('autoSwitch');
+            if (isAutoSwitch) {
+                autoSwitch.classList.add('active');
+            } else {
+                autoSwitch.classList.remove('active');
+            }
+            localStorage.setItem('memo.auto', isAutoSwitch ? '1' : '0');
+            handleAutoSwitch();
+        }
+        const savedAuto = localStorage.getItem('memo.auto');
+        if (savedAuto) {
+            isAutoSwitch = savedAuto === '1';
+            handleAutoSwitch();
+        }
         function registerServiceWorker() {
             if ('serviceWorker' in navigator) {
                 window.addEventListener('load', () => {
                     navigator.serviceWorker.register('./sw.js')
                         .then(registration => {
-                            console.log('SW registered: ', registration);
-                            
                             // Send memo URL to service worker for caching
                             if (currentUrl) {
                                 navigator.serviceWorker.ready.then(registration => {
@@ -473,7 +588,7 @@
                             }
                         })
                         .catch(registrationError => {
-                            console.log('SW registration failed: ', registrationError);
+                            alert('Error registering service worker: ' + registrationError);
                         });
                 });
             }
@@ -489,9 +604,11 @@
                     return response.text();
                 })
                 .then(text => {
+                    cachedData = text;
+                    localStorage.setItem('memo.cache', cachedData);
                     list = text.split('\n').filter(line => line.trim() !== '');
                     updateDisplay();
-                    
+
                     // Update service worker cache with new URL
                     if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
                         navigator.serviceWorker.controller.postMessage({
@@ -501,17 +618,29 @@
                     }
                 })
                 .catch(error => {
-                    console.error('Error loading data:', error);
-                    topElem.textContent = 'Error';
-                    bottomElem.textContent = 'Could not load data';
-                    list = [];
+                    alert('Error loading data: ' + error);
+                    // Try to use cached data if available
+                    if (cachedData) {
+                        list = cachedData.split('\n').filter(line => line.trim() !== '');
+                        updateDisplay();
+                    } else {
+                        topElem.textContent = 'Error';
+                        bottomElem.textContent = 'Could not load data';
+                        list = [];
+                    }
                 });
         }
 
         // Initialize on page load
         registerServiceWorker();
         initializeSettings();
-        loadDataWithCache();
+        if (currentUrl) {
+            loadDataWithCache();
+        } else if (cachedData) {
+            // Use cached data if available even without URL
+            list = cachedData.split('\n').filter(line => line.trim() !== '');
+            updateDisplay();
+        }
     </script>
 </body>
 
